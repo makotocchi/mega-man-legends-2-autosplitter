@@ -3,8 +3,6 @@
 
 state("duckstation-qt-x64-ReleaseLTCG") 
 {
-    long baseAddress : 0x6D96D8;
-    string11 gameId : 0x6D96D8, 0x925C;
 }
 state("PPSSPPWindows64")
 {
@@ -79,22 +77,23 @@ startup
     settings.Add("igt_screen", true, "IGT Screen");
     settings.SetToolTip("igt_screen", "Split when you reach the final IGT Screen");
 
+    // ASL Var Viewer Things
+    vars.Zenny = 0;
+    vars.Karma = 0;
+
     vars.TrainBattleCounter = 0;
     vars.IGTStarted = false;
-    vars.IGTStopped = false;
 
     vars.OnReset = (LiveSplit.Model.Input.EventHandlerT<TimerPhase>)((sender, e) => 
     {
         vars.TrainBattleCounter = 0;
         vars.IGTStarted = false;
-        vars.IGTStopped = false;
     });
     timer.OnReset += vars.OnReset;
 
     vars.OnStart = (EventHandler)((sender, e) => {
         vars.TrainBattleCounter = 0;
         vars.IGTStarted = vars.Memory["Area"].Current != 0x0039 || (vars.Memory["Area"].Current == 0x0039 && vars.Memory["IGT"].Current > vars.Memory["IGT"].Old);
-        vars.IGTStopped = false;
     });
     timer.OnStart += vars.OnStart;
 }
@@ -112,6 +111,8 @@ init
     if (processName.Contains("duckstation")) 
     {
         version = "DuckStation " + modules.First().FileVersionInfo.FileVersion;
+        vars.BaseAddress = IntPtr.Zero;
+        vars.GameIdWatcher = null;
     }
     else
     {
@@ -130,28 +131,69 @@ update
 
     if (version.StartsWith("DuckStation")) 
     {
-        if (vars.Memory == null || current.gameId != old.gameId)
+        if (vars.BaseAddress == IntPtr.Zero) 
         {
-            if (current.gameId == "SLUS_011.40")
+            foreach (var page in game.MemoryPages(true)) 
             {
-                vars.Memory = new MemoryWatcherList();
-                vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x9C808)) { Name = "Area" });
-                vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x9C818)) { Name = "IGT" });
-                vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x9C810)) { Name = "Final IGT" });
-                vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x9C816)) { Name = "Game Complete" });
-                vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr(current.baseAddress + 0x985D1)) { Name = "Refractors" });
-            }
-            else if (current.gameId == "SLPS_027.11")
-            {
-                vars.Memory = new MemoryWatcherList();
-                vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x9CAB0)) { Name = "Area" });
-                vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x9CAC0)) { Name = "IGT" });
-                vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x9CAB8)) { Name = "Final IGT" });
-                vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x9CABE)) { Name = "Game Complete" });
-                vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x98879)) { Name = "Refractors" });
+                if ((page.RegionSize == (UIntPtr)0x200000) && (page.Type == MemPageType.MEM_MAPPED))
+                {
+                    vars.BaseAddress = page.BaseAddress;
+                    break;
+                }
             }
 
-            vars.Memory.UpdateAll(game);
+            if (vars.BaseAddress != IntPtr.Zero)
+            {
+                vars.GameIdWatcher = new StringWatcher(new IntPtr((long)vars.BaseAddress + 0x925C), 11);
+            }
+        }
+
+
+        if (vars.GameIdWatcher != null)
+        {
+            vars.GameIdWatcher.Update(game);
+
+            if (vars.GameIdWatcher.Current != vars.GameIdWatcher.Old) 
+            {
+                if (vars.GameIdWatcher.Current == "SLUS_011.40")
+                {
+                    print("SLUS_011.40");
+
+                    vars.Memory = new MemoryWatcherList();
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C808)) { Name = "Area" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9C818)) { Name = "IGT" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9C810)) { Name = "Final IGT" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C816)) { Name = "Game Complete" });
+                    vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr((long)vars.BaseAddress + 0x985D1)) { Name = "Refractors" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9C820)) { Name = "Zenny" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C838)) { Name = "Karma" });
+
+                    vars.Memory.UpdateAll(game);
+                }
+                else if (vars.GameIdWatcher.Current == "SLPS_027.11")
+                {
+                    print("SLPS_027.11");
+
+                    vars.Memory = new MemoryWatcherList();
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAB0)) { Name = "Area" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9CAC0)) { Name = "IGT" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9CAB8)) { Name = "Final IGT" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CABE)) { Name = "Game Complete" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x98879)) { Name = "Refractors" });
+                    vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9CAC8)) { Name = "Zenny" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAE0)) { Name = "Karma" });
+                    
+                    vars.Memory.UpdateAll(game);
+                }
+                else
+                {
+                    print("Game closed");
+
+                    vars.Memory = null;
+                    vars.GameIdWatcher = null;
+                    vars.BaseAddress = IntPtr.Zero;
+                }
+            }
         }
     }
     else
@@ -164,6 +206,8 @@ update
             vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD14)) { Name = "Final IGT" });
             vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD1A)) { Name = "Game Complete" });
             vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr(current.baseAddress + 0x9057EC9)) { Name = "Refractors" });
+            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD24)) { Name = "Zenny" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD3C)) { Name = "Karma" });
 
             vars.Memory.UpdateAll(game);
         }
@@ -181,10 +225,8 @@ update
         vars.IGTStarted = vars.Memory["Area"].Current != 0x0039 || (vars.Memory["Area"].Current == 0x0039 && vars.Memory["IGT"].Current > vars.Memory["IGT"].Old);
     }
 
-    if (!vars.IGTStopped)
-    {
-        vars.IGTStopped = vars.Memory["Game Complete"].Current > vars.Memory["Game Complete"].Old;
-    }
+    vars.Zenny = vars.Memory["Zenny"].Current;
+    vars.Karma = vars.Memory["Karma"].Current;
 
     return true;
 }
@@ -199,11 +241,6 @@ gameTime
     if (!vars.IGTStarted)
     {
         return TimeSpan.FromSeconds(0);
-    }
-
-    if (vars.IGTStopped) // Game has ended, show final IGT
-    {
-        return TimeSpan.FromSeconds(vars.Memory["Final IGT"].Current / 60.0D);
     }
 
     return TimeSpan.FromSeconds(vars.Memory["IGT"].Current / 60.0D);
