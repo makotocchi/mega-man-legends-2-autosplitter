@@ -65,6 +65,9 @@ startup
     settings.Add("calinca_ruins", true, "Calinca Ruins");
     settings.SetToolTip("calinca_ruins", "Split when you complete Calinca Ruins");
 
+    settings.Add("geetz_battle", false, "Geetz Battle");
+    settings.SetToolTip("geetz_battle", "Split when you complete the Geetz Battle");
+
     settings.Add("defense_zone", false, "Defense Zone");
     settings.SetToolTip("defense_zone", "Split when you complete the Defense Zone");
 
@@ -80,6 +83,8 @@ startup
     // ASL Var Viewer Things
     vars.Zenny = 0;
     vars.Karma = 0;
+    vars.RollKarma = 0;
+    vars.NinoInvasionTimer = 0;
 
     vars.TrainBattleCounter = 0;
     vars.IGTStarted = false;
@@ -122,6 +127,23 @@ init
     vars.Memory = null;
 }
 
+exit
+{
+    vars.Zenny = 0;
+    vars.Karma = 0;
+    vars.RollKarma = 0;
+    vars.NinoInvasionTimer = 0;
+    vars.TrainBattleCounter = 0;
+    vars.IGTStarted = false;
+    vars.Memory = null;
+
+    if (version.StartsWith("DuckStation"))
+    {
+        vars.GameIdWatcher = null;
+        vars.BaseAddress = IntPtr.Zero;
+    }
+}
+
 update
 {
     if (string.IsNullOrEmpty(version)) 
@@ -158,6 +180,7 @@ update
                 if (vars.GameIdWatcher.Current == "SLUS_011.40")
                 {
                     print("SLUS_011.40");
+                    print("Base Address: " + ((long)vars.BaseAddress).ToString("X"));
 
                     vars.Memory = new MemoryWatcherList();
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C808)) { Name = "Area" });
@@ -167,12 +190,16 @@ update
                     vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr((long)vars.BaseAddress + 0x985D1)) { Name = "Refractors" });
                     vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9C820)) { Name = "Zenny" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C838)) { Name = "Karma" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C83A)) { Name = "Roll Karma" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E640)) { Name = "Nino Invasion Timer 1" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E660)) { Name = "Nino Invasion Timer 2" });
 
                     vars.Memory.UpdateAll(game);
                 }
                 else if (vars.GameIdWatcher.Current == "SLPS_027.11")
                 {
                     print("SLPS_027.11");
+                    print("Base Address: " + ((long)vars.BaseAddress).ToString("X"));
 
                     vars.Memory = new MemoryWatcherList();
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAB0)) { Name = "Area" });
@@ -182,12 +209,15 @@ update
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x98879)) { Name = "Refractors" });
                     vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9CAC8)) { Name = "Zenny" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAE0)) { Name = "Karma" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAE2)) { Name = "Roll Karma" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E8C8)) { Name = "Nino Invasion Timer 1" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E8E8)) { Name = "Nino Invasion Timer 2" });
                     
                     vars.Memory.UpdateAll(game);
                 }
                 else
                 {
-                    print("Game closed");
+                    print("Game not loaded");
 
                     vars.Memory = null;
                     vars.GameIdWatcher = null;
@@ -198,8 +228,11 @@ update
     }
     else
     {
-        if (vars.Memory == null)
+        if (vars.Memory == null && current.baseAddress != 0x0)
         {
+            print("PSP");
+            print("Base Address: " + current.baseAddress.ToString("X"));
+
             vars.Memory = new MemoryWatcherList();
             vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD0C)) { Name = "Area" });
             vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD1C)) { Name = "IGT" });
@@ -208,8 +241,15 @@ update
             vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr(current.baseAddress + 0x9057EC9)) { Name = "Refractors" });
             vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD24)) { Name = "Zenny" });
             vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD3C)) { Name = "Karma" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD3E)) { Name = "Roll Karma" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x902E0CC)) { Name = "Nino Invasion Timer 1" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x902E10C)) { Name = "Nino Invasion Timer 2" });
 
             vars.Memory.UpdateAll(game);
+        }
+        else if (current.baseAddress == 0x0)
+        {
+            vars.Memory = null;
         }
     }
 
@@ -227,6 +267,20 @@ update
 
     vars.Zenny = vars.Memory["Zenny"].Current;
     vars.Karma = vars.Memory["Karma"].Current;
+    vars.RollKarma = vars.Memory["Roll Karma"].Current;
+    
+    if (vars.Memory["Area"].Current == 0x0016)
+    {
+        vars.NinoInvasionTimer = vars.Memory["Nino Invasion Timer 1"].Current;
+    }
+    else if (vars.Memory["Area"].Current == 0x0015)
+    {
+        vars.NinoInvasionTimer = vars.Memory["Nino Invasion Timer 2"].Current;
+    }
+    else
+    {
+        vars.NinoInvasionTimer = 0;
+    }
 
     return true;
 }
@@ -342,6 +396,11 @@ split
     }
 
     if (settings["calinca_ruins"] && vars.Memory["Area"].Old == 0x072F && vars.Memory["Area"].Current == 0x010B) // complete calinca ruins
+    {
+        return true;
+    }
+
+    if (settings["geetz_battle"] && vars.Memory["Area"].Old == 0x054B && vars.Memory["Area"].Current == 0x0052) // beat geetz
     {
         return true;
     }
