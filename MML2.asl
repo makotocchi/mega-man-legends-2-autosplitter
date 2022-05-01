@@ -25,6 +25,9 @@ startup
     settings.Add("ignore_igt", false, "Ignore IGT");
     settings.SetToolTip("ignore_igt", "If enabled, Livesplit will ignore the in-game timer, but it will still stop the timer when the game is loading (useful for testing strats)");
 
+    settings.Add("area_change_start", false, "Start timer when the area changes");
+    settings.SetToolTip("area_change_start", "If enabled, it starts the timer when the area changes");
+
     settings.CurrentDefaultParent = "split_settings";
 
     settings.Add("area_split", false, "Split whenever the area changes");
@@ -327,6 +330,11 @@ gameTime
 
 start
 {
+    if (settings["area_change_start"])
+    {
+        return vars.Memory["Area"].Old != vars.Memory["Area"].Current;
+    }
+
     if (settings["igt_timer_start"])
     {
         return vars.Memory["Area"].Current == 0x0039 && vars.Memory["IGT"].Current > vars.Memory["IGT"].Old && vars.Memory["IGT"].Old == 0;
