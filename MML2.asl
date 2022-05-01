@@ -191,7 +191,7 @@ update
                     vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x9C820)) { Name = "Zenny" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C838)) { Name = "Karma" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9C83A)) { Name = "Roll Karma" });
-                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E640)) { Name = "Nino Invasion Timer 1" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E620)) { Name = "Nino Invasion Timer 1" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E660)) { Name = "Nino Invasion Timer 2" });
 
                     vars.Memory.UpdateAll(game);
@@ -211,7 +211,7 @@ update
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAE0)) { Name = "Karma" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9CAE2)) { Name = "Roll Karma" });
                     vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E8C8)) { Name = "Nino Invasion Timer 1" });
-                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E8E8)) { Name = "Nino Invasion Timer 2" });
+                    vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x9E908)) { Name = "Nino Invasion Timer 2" });
                     
                     vars.Memory.UpdateAll(game);
                 }
