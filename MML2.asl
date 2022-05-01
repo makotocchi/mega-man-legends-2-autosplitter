@@ -11,8 +11,24 @@ state("PPSSPPWindows64")
 
 startup
 {
+    settings.Add("timer_settings", true, "Timer Settings");
+    settings.SetToolTip("timer_settings", "Settings related to the timer");
+
+    settings.Add("split_settings", true, "Split Settings");
+    settings.SetToolTip("split_settings", "Settings related to auto splitting");
+
+    settings.CurrentDefaultParent = "timer_settings";
+
     settings.Add("igt_timer_start", true, "Start timer when IGT starts");
     settings.SetToolTip("igt_timer_start", "If disabled, it starts the timer when the RTA timer normally would start");
+
+    settings.Add("ignore_igt", false, "Ignore IGT");
+    settings.SetToolTip("ignore_igt", "If enabled, Livesplit will ignore the in-game timer, but it will still stop the timer when the game is loading (useful for testing strats)");
+
+    settings.CurrentDefaultParent = "split_settings";
+
+    settings.Add("area_split", false, "Split whenever the area changes");
+    settings.SetToolTip("area_split", "Split whenever you go to a different area, even if it doesn't stop IGT. The settings below will be ignored in case this is checked. (WARNING: not recommended for full game runs)");
 
     settings.Add("abandoned_mines", true, "Abandoned Mines");
     settings.SetToolTip("abandoned_mines", "Split when you complete Abandoned Mines");
@@ -80,6 +96,8 @@ startup
     settings.Add("igt_screen", true, "IGT Screen");
     settings.SetToolTip("igt_screen", "Split when you reach the final IGT Screen");
 
+    settings.CurrentDefaultParent = null;
+
     // ASL Var Viewer Things
     vars.Zenny = 0;
     vars.Karma = 0;
@@ -88,17 +106,20 @@ startup
 
     vars.TrainBattleCounter = 0;
     vars.IGTStarted = false;
+    vars.IGTWhenTimerStarted = 0;
 
     vars.OnReset = (LiveSplit.Model.Input.EventHandlerT<TimerPhase>)((sender, e) => 
     {
         vars.TrainBattleCounter = 0;
         vars.IGTStarted = false;
+        vars.IGTWhenTimerStarted = 0;
     });
     timer.OnReset += vars.OnReset;
 
     vars.OnStart = (EventHandler)((sender, e) => {
         vars.TrainBattleCounter = 0;
         vars.IGTStarted = vars.Memory["Area"].Current != 0x0039 || (vars.Memory["Area"].Current == 0x0039 && vars.Memory["IGT"].Current > vars.Memory["IGT"].Old);
+        vars.IGTWhenTimerStarted = vars.Memory["IGT"].Current;
     });
     timer.OnStart += vars.OnStart;
 }
@@ -135,6 +156,7 @@ exit
     vars.NinoInvasionTimer = 0;
     vars.TrainBattleCounter = 0;
     vars.IGTStarted = false;
+    vars.IGTWhenTimerStarted = 0;
     vars.Memory = null;
 
     if (version.StartsWith("DuckStation"))
@@ -217,8 +239,6 @@ update
                 }
                 else
                 {
-                    print("Game not loaded");
-
                     vars.Memory = null;
                     vars.GameIdWatcher = null;
                     vars.BaseAddress = IntPtr.Zero;
@@ -292,6 +312,11 @@ isLoading
 
 gameTime
 {
+    if (settings["ignore_igt"])
+    {
+        return TimeSpan.FromSeconds((vars.Memory["IGT"].Current - vars.IGTWhenTimerStarted) / 60.0D);
+    }
+
     if (!vars.IGTStarted)
     {
         return TimeSpan.FromSeconds(0);
@@ -313,6 +338,11 @@ start
 
 split
 {
+    if (settings["area_split"])
+    {
+        return vars.Memory["Area"].Old != vars.Memory["Area"].Current;
+    }
+
     if (settings["abandoned_mines"] && vars.Memory["Area"].Old == 0x0B0F && vars.Memory["Area"].Current == 0x0247) // complete abandoned mine
     {
         return true;
