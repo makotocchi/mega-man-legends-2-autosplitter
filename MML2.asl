@@ -6,7 +6,6 @@ state("duckstation-qt-x64-ReleaseLTCG")
 }
 state("PPSSPPWindows64")
 {
-    long baseAddress : 0xD96108;
 }
 
 startup
@@ -136,11 +135,11 @@ shutdown
 init
 {
     var processName = game.ProcessName.ToLowerInvariant();
+    vars.BaseAddress = IntPtr.Zero;
 
     if (processName.Contains("duckstation")) 
     {
         version = "DuckStation " + modules.First().FileVersionInfo.FileVersion;
-        vars.BaseAddress = IntPtr.Zero;
         vars.GameIdWatcher = null;
     }
     else
@@ -161,11 +160,11 @@ exit
     vars.IGTStarted = false;
     vars.IGTWhenTimerStarted = 0;
     vars.Memory = null;
+    vars.BaseAddress = IntPtr.Zero;
 
     if (version.StartsWith("DuckStation"))
     {
         vars.GameIdWatcher = null;
-        vars.BaseAddress = IntPtr.Zero;
     }
 }
 
@@ -251,26 +250,44 @@ update
     }
     else
     {
-        if (vars.Memory == null && current.baseAddress != 0x0)
+        if (vars.BaseAddress == IntPtr.Zero) 
+        {
+            foreach (var page in game.MemoryPages(true)) 
+            {
+                if ((page.RegionSize == (UIntPtr)0x10000) && (page.Type == MemPageType.MEM_MAPPED))
+                {
+                    var baseAddress = new IntPtr((long)page.BaseAddress - 0x10000);
+                    var gameCode = memory.ReadString(new IntPtr((long)baseAddress + 0x8AB8EE8), 9);
+
+                    if (gameCode == "ULJM05037")
+                    {
+                        vars.BaseAddress = baseAddress;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (vars.Memory == null && vars.BaseAddress != IntPtr.Zero)
         {
             print("PSP");
-            print("Base Address: " + current.baseAddress.ToString("X"));
+            print("Base Address: " + vars.BaseAddress.ToString("X"));
 
             vars.Memory = new MemoryWatcherList();
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD0C)) { Name = "Area" });
-            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD1C)) { Name = "IGT" });
-            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD14)) { Name = "Final IGT" });
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD1A)) { Name = "Game Complete" });
-            vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr(current.baseAddress + 0x9057EC9)) { Name = "Refractors" });
-            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr(current.baseAddress + 0x8DADD24)) { Name = "Zenny" });
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD3C)) { Name = "Karma" });
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x8DADD3E)) { Name = "Roll Karma" });
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x902E0CC)) { Name = "Nino Invasion Timer 1" });
-            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr(current.baseAddress + 0x902E10C)) { Name = "Nino Invasion Timer 2" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x8DADD0C)) { Name = "Area" });
+            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x8DADD1C)) { Name = "IGT" });
+            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x8DADD14)) { Name = "Final IGT" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x8DADD1A)) { Name = "Game Complete" });
+            vars.Memory.Add(new MemoryWatcher<byte>(new IntPtr((long)vars.BaseAddress + 0x9057EC9)) { Name = "Refractors" });
+            vars.Memory.Add(new MemoryWatcher<int>(new IntPtr((long)vars.BaseAddress + 0x8DADD24)) { Name = "Zenny" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x8DADD3C)) { Name = "Karma" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x8DADD3E)) { Name = "Roll Karma" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x902E0CC)) { Name = "Nino Invasion Timer 1" });
+            vars.Memory.Add(new MemoryWatcher<short>(new IntPtr((long)vars.BaseAddress + 0x902E10C)) { Name = "Nino Invasion Timer 2" });
 
             vars.Memory.UpdateAll(game);
         }
-        else if (current.baseAddress == 0x0)
+        else if (vars.BaseAddress == IntPtr.Zero)
         {
             vars.Memory = null;
         }
