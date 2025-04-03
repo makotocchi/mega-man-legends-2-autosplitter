@@ -183,8 +183,28 @@ update
             {
                 if ((page.RegionSize == (UIntPtr)0x200000) && (page.Type == MemPageType.MEM_MAPPED))
                 {
+                    print("Found correct DuckStation memory page.");
                     vars.BaseAddress = page.BaseAddress;
                     break;
+                }
+            }
+
+            if (vars.BaseAddress == IntPtr.Zero) // second strategy, signature scanning
+            {
+                print("Memory page not found, signature scanning instead.");
+
+                var mainModule = modules.First();
+
+                print("Duckstation Base Address: " + ((long)mainModule.BaseAddress).ToString("X"));
+                print("Duckstation Module Memory Size: " + ((long)mainModule.ModuleMemorySize).ToString("X"));
+
+                var scanner = new SignatureScanner(game, mainModule.BaseAddress, 0x100000);
+                var scanResult = scanner.Scan(new SigScanTarget(0, "4C 8B 05 ?? ?? ?? ?? 66 C7 44 24 28 30 00 C7 44 24 20"));
+
+                if (scanResult != IntPtr.Zero)
+                {
+                    var pointerToBaseAddress = (IntPtr)((long)memory.ReadValue<int>(scanResult + 3) + (long)scanResult + 0x7);
+                    vars.BaseAddress = (IntPtr)memory.ReadValue<long>(pointerToBaseAddress);
                 }
             }
 
